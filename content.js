@@ -37,15 +37,23 @@ function getMetadata() {
 
 // ── 读取背景图 URL ──────────────────────────────────────────────────────
 // 优先从 theme_ 桥接数据读取（切换壁纸时 theme_ 立即更新，iframe src 有延迟）
+
+// 将 Google 图片代理 URL 的分辨率参数替换为 4K (3840×2160)
+// 例: =w1920-h1080-p-k-no-nd-mv → =w3840-h2160-p-k-no-nd-mv
+function upscaleTo4K(url) {
+    if (!url) return url;
+    return url.replace(/=w\d+-h\d+/, '=w3840-h2160');
+}
+
 function getImageUrl() {
     const themeEl = document.getElementById('__bgdl_theme_data__');
-    if (themeEl?.dataset.imageUrl) return themeEl.dataset.imageUrl;
+    if (themeEl?.dataset.imageUrl) return upscaleTo4K(themeEl.dataset.imageUrl);
 
     const iframe = document.getElementById('backgroundImage');
     if (!iframe) return null;
     const src = iframe.src || iframe.getAttribute('src') || '';
     const m = src.match(/[?&]url=([^&]+)/);
-    return m ? decodeURIComponent(m[1]) : null;
+    return m ? upscaleTo4K(decodeURIComponent(m[1])) : null;
 }
 
 // ── 文件名：包含所有可用元信息 ───────────────────────────────────────────
