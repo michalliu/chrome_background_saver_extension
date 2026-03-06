@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "新标签页壁纸保存",
+  "version": "1.0",
+  "description": "在 Chrome 新标签页添加一键保存壁纸按钮，文件名包含艺术家信息",
+  "permissions": [
+    "downloads",
+    "notifications"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["chrome://new-tab-page/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}
