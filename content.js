@@ -38,8 +38,12 @@ function getMetadata() {
     return { title, artist, collectionId, attrUrl };
 }
 
-// ── 读取背景图 URL（从 iframe src）───────────────────────────────────────
+// ── 读取背景图 URL ──────────────────────────────────────────────────────
+// 优先从 theme_ 桥接数据读取（切换壁纸时 theme_ 立即更新，iframe src 有延迟）
 function getImageUrl() {
+    const themeEl = document.getElementById('__bgdl_theme_data__');
+    if (themeEl?.dataset.imageUrl) return themeEl.dataset.imageUrl;
+
     const iframe = document.getElementById('backgroundImage');
     if (!iframe) return null;
     const src = iframe.src || iframe.getAttribute('src') || '';

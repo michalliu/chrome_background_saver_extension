@@ -4,12 +4,19 @@
 // 提取 theme_ 中的元信息并写入隐藏 DOM 元素，供隔离 world 的 content.js 读取
 
 (function () {
-    function extract() {
-        const ntpApp = document.querySelector('ntp-app');
-        const theme = ntpApp && ntpApp.theme_;
-        if (!theme) return false;
+    var lastUrl = '';
 
-        let el = document.getElementById('__bgdl_theme_data__');
+    function sync() {
+        var ntpApp = document.querySelector('ntp-app');
+        var theme = ntpApp && ntpApp.theme_;
+        if (!theme) return;
+
+        // 用图片 URL 作为变更标识，避免每次都写 DOM
+        var url = (theme.backgroundImage && theme.backgroundImage.url && theme.backgroundImage.url.url) || '';
+        if (url === lastUrl) return;
+        lastUrl = url;
+
+        var el = document.getElementById('__bgdl_theme_data__');
         if (!el) {
             el = document.createElement('div');
             el.id = '__bgdl_theme_data__';
@@ -20,11 +27,9 @@
         el.dataset.attribution2 = theme.backgroundImageAttribution2 || '';
         el.dataset.collectionId = theme.backgroundImageCollectionId || '';
         el.dataset.attrUrl      = (theme.backgroundImageAttributionUrl && theme.backgroundImageAttributionUrl.url) || '';
-        return true;
+        el.dataset.imageUrl     = (theme.backgroundImage && theme.backgroundImage.url && theme.backgroundImage.url.url) || '';
     }
 
-    // theme_ 可能在页面生命周期中异步赋值，轮询直到拿到
-    const tid = setInterval(function () {
-        if (extract()) clearInterval(tid);
-    }, 200);
+    // 持续轮询：用户切换壁纸时 theme_ 会更新，需要及时同步到 DOM
+    setInterval(sync, 500);
 })();
