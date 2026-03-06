@@ -207,13 +207,41 @@ function createButton() {
     LOG('✓ 按钮已挂载到 DOM');
 }
 
-// ── 轮询等待 customizeButton 就绪后注入 ──────────────────────────────────
-LOG('启动 200ms 轮询');
-const timer = setInterval(() => {
+// ── 等待 customizeButton 就绪后注入 ──────────────────────────────────────
+// 使用 MutationObserver 监听 shadow DOM，避免轮询
+function waitForCustomizeButton() {
     const ntpApp = document.querySelector('ntp-app');
-    if (!ntpApp || !ntpApp.shadowRoot) return;
-    if (!ntpApp.shadowRoot.getElementById('customizeButton')) return;
-    clearInterval(timer);
-    LOG('✓ customizeButton 就绪，停止轮询');
-    createButton();
-}, 200);
+    if (!ntpApp) {
+        // ntp-app 还没出现，监听 document.body 等它出现
+        const bodyObs = new MutationObserver(() => {
+            if (document.querySelector('ntp-app')) {
+                bodyObs.disconnect();
+                waitForCustomizeButton();
+            }
+        });
+        bodyObs.observe(document.body, { childList: true, subtree: true });
+        return;
+    }
+
+    const sr = ntpApp.shadowRoot;
+    if (!sr) return; // 无 shadowRoot 则无法继续
+
+    // 已就绪则直接注入
+    if (sr.getElementById('customizeButton')) {
+        LOG('✓ customizeButton 已就绪');
+        createButton();
+        return;
+    }
+
+    // 否则监听 shadow DOM 子树变化
+    const obs = new MutationObserver(() => {
+        if (sr.getElementById('customizeButton')) {
+            obs.disconnect();
+            LOG('✓ customizeButton 就绪（MutationObserver）');
+            createButton();
+        }
+    });
+    obs.observe(sr, { childList: true, subtree: true });
+}
+
+waitForCustomizeButton();

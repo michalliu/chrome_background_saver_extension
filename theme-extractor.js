@@ -4,18 +4,8 @@
 // 提取 theme_ 中的元信息并写入隐藏 DOM 元素，供隔离 world 的 content.js 读取
 
 (function () {
-    var lastUrl = '';
-
-    function sync() {
-        var ntpApp = document.querySelector('ntp-app');
-        var theme = ntpApp && ntpApp.theme_;
+    function writeToDom(theme) {
         if (!theme) return;
-
-        // 用图片 URL 作为变更标识，避免每次都写 DOM
-        var url = (theme.backgroundImage && theme.backgroundImage.url && theme.backgroundImage.url.url) || '';
-        if (url === lastUrl) return;
-        lastUrl = url;
-
         var el = document.getElementById('__bgdl_theme_data__');
         if (!el) {
             el = document.createElement('div');
@@ -30,6 +20,33 @@
         el.dataset.imageUrl     = (theme.backgroundImage && theme.backgroundImage.url && theme.backgroundImage.url.url) || '';
     }
 
-    // 持续轮询：用户切换壁纸时 theme_ 会更新，需要及时同步到 DOM
-    setInterval(sync, 500);
+    function init() {
+        var ntpApp = document.querySelector('ntp-app');
+        if (!ntpApp) return;
+
+        // 初始同步：脚本可能在 setTheme 回调之后才运行
+        if (ntpApp.theme_) writeToDom(ntpApp.theme_);
+
+        // 监听后续主题变更（壁纸切换时触发）
+        var router = ntpApp.callbackRouter_;
+        if (router && router.setTheme && typeof router.setTheme.addListener === 'function') {
+            router.setTheme.addListener(function (theme) {
+                writeToDom(theme);
+            });
+        }
+    }
+
+    // ntp-app 在 document_idle 时通常已存在，直接尝试
+    if (document.querySelector('ntp-app')) {
+        init();
+    } else {
+        // 极少数情况下 ntp-app 尚未就绪，监听 DOM 等待
+        var obs = new MutationObserver(function () {
+            if (document.querySelector('ntp-app')) {
+                obs.disconnect();
+                init();
+            }
+        });
+        obs.observe(document.body, { childList: true, subtree: true });
+    }
 })();
