@@ -23,16 +23,16 @@ Five files, no build step:
 | File | Role |
 |------|------|
 | `manifest.json` | MV3 manifest — declares permissions (`downloads`, `notifications`), two content scripts (MAIN + ISOLATED world), and service worker |
-| `theme-extractor.js` | Content script running in `MAIN` world — continuously polls `ntp-app.theme_` for metadata changes and bridges data to a hidden DOM element |
-| `content.js` | Content script running in ISOLATED world — polls for shadow DOM readiness, injects button, reads metadata from bridged DOM element, triggers download |
+| `theme-extractor.js` | Content script running in `MAIN` world — listens for theme changes via `callbackRouter_.setTheme` and bridges data to a hidden DOM element |
+| `content.js` | Content script running in ISOLATED world — waits for shadow DOM readiness via MutationObserver, injects button, reads metadata from bridged DOM element, manages concurrent download queue |
 | `background.js` | Service worker — receives `DOWNLOAD` messages and calls `chrome.downloads.download()` |
 | `icon.png` | Extension icon |
 
 ## Key Implementation Details
 
-**Shadow DOM traversal:** The new tab page uses a `<ntp-app>` custom element with a closed-ish shadow root. `content.js` accesses it via `document.querySelector('ntp-app').shadowRoot` and polls every 200ms until `#customizeButton` is present before injecting the button.
+**Shadow DOM traversal:** The new tab page uses a `<ntp-app>` custom element with a closed-ish shadow root. `content.js` accesses it via `document.querySelector('ntp-app').shadowRoot` and uses a MutationObserver to wait until `#customizeButton` is present before injecting the button.
 
-**MAIN world bridge (theme-extractor.js):** Content scripts run in an isolated world and cannot access page JS object properties like `ntp-app.theme_`. `theme-extractor.js` is registered with `"world": "MAIN"` in the manifest, giving it access to the page's JS context. It continuously polls `theme_` (every 500ms, skipping writes when the image URL hasn't changed) and writes metadata to a hidden `<div id="__bgdl_theme_data__">` via `dataset` attributes. The isolated-world `content.js` reads this DOM element to get current metadata. Inline `<script>` injection doesn't work here because `chrome://` pages enforce a strict CSP.
+**MAIN world bridge (theme-extractor.js):** Content scripts run in an isolated world and cannot access page JS object properties like `ntp-app.theme_`. `theme-extractor.js` is registered with `"world": "MAIN"` in the manifest, giving it access to the page's JS context. It reads the initial `theme_` value and listens for subsequent changes via `callbackRouter_.setTheme.addListener()`, writing metadata to a hidden `<div id="__bgdl_theme_data__">` via `dataset` attributes. The isolated-world `content.js` reads this DOM element to get current metadata. Inline `<script>` injection doesn't work here because `chrome://` pages enforce a strict CSP.
 
 **Image URL extraction:** `getImageUrl()` reads from the bridged theme data (`dataset.imageUrl`) first, falling back to parsing the `backgroundImage` iframe's `src` query parameter. The theme data is preferred because `theme_` updates immediately on wallpaper change, while the iframe `src` may lag behind.
 
@@ -42,7 +42,7 @@ Five files, no build step:
 
 **Filename format:** `{title}-{attribution2}-{collectionId}-{timestamp_ms}.jpg` — parts are joined with `-`, each sanitized to remove filesystem-unsafe characters. Example: `新的喜悦-Kate Dehler的艺术作品-rising_artists_collection-1772817180982.png`
 
-**Button states:** idle → loading → done/error → (auto-reset to idle after 2.5s)
+**Concurrent download queue:** Multiple downloads can run in parallel. A `pendingCount` counter tracks in-flight downloads. Each click snapshots the current URL + metadata immediately, so theme changes between clicks don't affect queued downloads. Button shows `…` when one download is pending, `…N` (with count badge) when multiple are pending, and briefly flashes `✓`/`✕` when all downloads complete. Chrome limits concurrent downloads per domain to ~3; additional downloads are queued internally by the browser.
 
 ## Chrome API Constraints
 
