@@ -72,41 +72,73 @@ function buildFilename(meta) {
     return parts.join('-') + '.jpg';
 }
 
-// ── 按钮状态 ─────────────────────────────────────────────────────────────
-const STATE = { idle: 0, loading: 1, done: 2, error: 3 };
-let currentState = STATE.idle;
+// ── 按钮状态（支持并发下载队列）─────────────────────────────────────────
+let pendingCount = 0;
+let flashTimer = null;   // 用于短暂显示 ✓/✕ 后恢复
 
-function setButtonState(btn, state) {
-    currentState = state;
+function updateButtonAppearance(btn, flash) {
     const btnIcon  = btn.querySelector('.bgdl-icon');
     const btnLabel = btn.querySelector('.bgdl-label');
 
-    const configs = {
-        [STATE.idle]:    { icon: '↓', text: '', color: 'rgba(255,255,255,0.18)' },
-        [STATE.loading]: { icon: '…', text: '', color: 'rgba(255,255,255,0.10)' },
-        [STATE.done]:    { icon: '✓', text: '', color: 'rgba(100,220,130,0.28)' },
-        [STATE.error]:   { icon: '✕', text: '', color: 'rgba(255,100,100,0.28)' },
-    };
-    const c = configs[state];
-    btnIcon.textContent  = c.icon;
-    btnLabel.textContent = c.text;
-    btn.style.background = c.color;
-    LOG('按钮状态切换:', c.text);
-
-    if (state === STATE.done || state === STATE.error) {
-        setTimeout(() => setButtonState(btn, STATE.idle), 2500);
+    if (flash) {
+        // 短暂闪烁成功/失败状态
+        const isError = flash === 'error';
+        btnIcon.textContent  = isError ? '✕' : '✓';
+        btnLabel.textContent = '';
+        btn.style.background = isError
+            ? 'rgba(255,100,100,0.28)'
+            : 'rgba(100,220,130,0.28)';
+        btn.style.width      = '32px';
+        btn.style.padding    = '0';
+        btn.style.gap        = '0';
+        LOG('按钮闪烁:', flash);
+        return;
     }
+
+    if (pendingCount > 1) {
+        btnIcon.textContent  = '…';
+        btnLabel.textContent = String(pendingCount);
+        btn.style.background = 'rgba(255,255,255,0.10)';
+        btn.style.width      = 'auto';
+        btn.style.padding    = '0 8px';
+        btn.style.gap        = '2px';
+    } else if (pendingCount === 1) {
+        btnIcon.textContent  = '…';
+        btnLabel.textContent = '';
+        btn.style.background = 'rgba(255,255,255,0.10)';
+        btn.style.width      = '32px';
+        btn.style.padding    = '0';
+        btn.style.gap        = '0';
+    } else {
+        btnIcon.textContent  = '↓';
+        btnLabel.textContent = '';
+        btn.style.background = 'rgba(255,255,255,0.18)';
+        btn.style.width      = '32px';
+        btn.style.padding    = '0';
+        btn.style.gap        = '0';
+    }
+    LOG('按钮状态: pending=' + pendingCount);
 }
 
-// ── 执行下载（通过 chrome.downloads API）────────────────────────────────
-function doDownload(btn) {
-    if (currentState === STATE.loading) return;
+function flashButton(btn, type) {
+    clearTimeout(flashTimer);
+    if (pendingCount > 0) {
+        // 还有下载在进行，不闪烁，直接更新计数
+        updateButtonAppearance(btn);
+        return;
+    }
+    updateButtonAppearance(btn, type);
+    flashTimer = setTimeout(() => updateButtonAppearance(btn), 2500);
+}
 
+// ── 执行下载（支持并发，点击时快照 URL 与元信息）────────────────────────
+function doDownload(btn) {
+    // 立即快照当前图片 URL 与元信息
     const imageUrl = getImageUrl();
     LOG('imageUrl:', imageUrl);
     if (!imageUrl) {
         LOG('✗ 未获取到图片 URL');
-        setButtonState(btn, STATE.error);
+        flashButton(btn, 'error');
         return;
     }
 
@@ -115,17 +147,19 @@ function doDownload(btn) {
     LOG('metadata:', meta);
     LOG('filename:', filename);
 
-    setButtonState(btn, STATE.loading);
+    pendingCount++;
+    updateButtonAppearance(btn);
 
     chrome.runtime.sendMessage(
         { type: 'DOWNLOAD', url: imageUrl, filename },
         (response) => {
+            pendingCount--;
             if (chrome.runtime.lastError || !response?.ok) {
                 LOG('✗ 下载失败:', chrome.runtime.lastError?.message || response?.error);
-                setButtonState(btn, STATE.error);
+                flashButton(btn, 'error');
             } else {
                 LOG('✓ 下载完成:', filename);
-                setButtonState(btn, STATE.done);
+                flashButton(btn, 'done');
             }
         }
     );
@@ -172,7 +206,7 @@ function createButton() {
         fontWeight:          '500',
         letterSpacing:       '0.01em',
         cursor:              'pointer',
-        transition:          'background 0.25s, transform 0.15s, box-shadow 0.2s',
+        transition:          'background 0.25s, transform 0.15s, box-shadow 0.2s, width 0.2s, padding 0.2s',
         boxShadow:           '0 2px 12px rgba(0,0,0,0.18)',
         userSelect:          'none',
         outline:             'none',
@@ -183,14 +217,14 @@ function createButton() {
     Object.assign(label.style, { lineHeight: '1' });
 
     btn.addEventListener('mouseenter', () => {
-        if (currentState !== STATE.loading) {
+        if (pendingCount === 0) {
             btn.style.background = 'rgba(255,255,255,0.28)';
             btn.style.boxShadow  = '0 4px 18px rgba(0,0,0,0.25)';
             btn.style.transform  = 'translateY(-1px)';
         }
     });
     btn.addEventListener('mouseleave', () => {
-        if (currentState === STATE.idle) {
+        if (pendingCount === 0) {
             btn.style.background = 'rgba(255,255,255,0.18)';
             btn.style.boxShadow  = '0 2px 12px rgba(0,0,0,0.18)';
             btn.style.transform  = '';
