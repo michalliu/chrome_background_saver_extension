@@ -24,9 +24,6 @@ function getMetadata() {
         || sr?.getElementById('backgroundImageAttribution2')?.textContent?.trim()
         || '';
 
-    // 提取纯艺术家名：去掉 "的艺术作品" / "的作品" 等后缀
-    const artist = attribution2.replace(/的(艺术)?作品$/, '').trim();
-
     // 合集 ID，如 "rising_artists_collection"
     const collectionId = themeEl?.dataset.collectionId || '';
 
@@ -35,7 +32,7 @@ function getMetadata() {
         || sr?.getElementById('backgroundImageAttribution')?.href
         || '';
 
-    return { title, artist, collectionId, attrUrl };
+    return { title, attribution2, collectionId, attrUrl };
 }
 
 // ── 读取背景图 URL ──────────────────────────────────────────────────────
@@ -61,8 +58,8 @@ function buildFilename(meta) {
 
     // 作品标题
     if (meta.title)        parts.push(sanitize(meta.title));
-    // 艺术家
-    if (meta.artist)       parts.push(sanitize(meta.artist));
+    // 艺术家归属（保留原始文本，如 "Kate Dehler的艺术作品"）
+    if (meta.attribution2) parts.push(sanitize(meta.attribution2));
     // 合集
     if (meta.collectionId) parts.push(sanitize(meta.collectionId));
     // 时间戳兜底（确保文件名唯一）
@@ -72,7 +69,7 @@ function buildFilename(meta) {
         // 没有任何元信息，仅时间戳
         return 'chrome_newtab_bg_' + parts[0] + '.jpg';
     }
-    return parts.join('_') + '.jpg';
+    return parts.join('-') + '.jpg';
 }
 
 // ── 按钮状态 ─────────────────────────────────────────────────────────────
