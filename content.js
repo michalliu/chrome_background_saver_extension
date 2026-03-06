@@ -151,18 +151,18 @@ function createButton() {
 
     Object.assign(btn.style, {
         position:            'fixed',
-        bottom:              '20px',
-        right:               '68px',
+        bottom:              '16px',
+        right:               '56px',  // 16(margin) + 32(customize btn) + 8(gap)
         zIndex:              '9999',
         display:             'flex',
         alignItems:          'center',
         gap:                 '0',
         padding:             '0',
-        width:               '36px',
-        height:              '36px',
+        width:               '32px',
+        height:              '32px',
         justifyContent:      'center',
         border:              '1px solid rgba(255,255,255,0.35)',
-        borderRadius:        '18px',
+        borderRadius:        '16px',
         background:          'rgba(255,255,255,0.18)',
         backdropFilter:      'blur(12px) saturate(1.6)',
         WebkitBackdropFilter:'blur(12px) saturate(1.6)',
