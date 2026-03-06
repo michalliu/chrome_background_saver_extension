@@ -13,6 +13,12 @@
   "content_scripts": [
     {
       "matches": ["chrome://new-tab-page/*"],
+      "js": ["theme-extractor.js"],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["chrome://new-tab-page/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }

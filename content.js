@@ -4,16 +4,38 @@ const LOG = (...args) => console.log('[BG Saver] ' + args.map(a => typeof a === 
 
 LOG('脚本启动');
 
-// ── 读取艺术家信息（从 ntp-app shadow DOM）──────────────────────────────
-function getAttribution() {
+// ── 读取作品元信息 ───────────────────────────────────────────────────────
+// theme-extractor.js 运行在 MAIN world，将 theme_ 数据写入隐藏 DOM 元素
+// 本脚本运行在隔离 world，通过读取该 DOM 元素获取元信息
+function getMetadata() {
     const ntpApp = document.querySelector('ntp-app');
-    const sr = ntpApp && ntpApp.shadowRoot;
-    if (!sr) return { line1: '', line2: '', href: '' };
-    return {
-        line1: sr.getElementById('backgroundImageAttribution1')?.textContent?.trim() || '',
-        line2: sr.getElementById('backgroundImageAttribution2')?.textContent?.trim() || '',
-        href:  sr.getElementById('backgroundImageAttribution')?.href || '',
-    };
+    const sr = ntpApp?.shadowRoot;
+
+    // 优先从 MAIN world 注入的 DOM 元素读取
+    const themeEl = document.getElementById('__bgdl_theme_data__');
+
+    // 作品标题
+    const title = themeEl?.dataset.title
+        || sr?.getElementById('backgroundImageAttribution1')?.textContent?.trim()
+        || '';
+
+    // 艺术家归属文本，如 "Dirtypote的艺术作品"
+    const attribution2 = themeEl?.dataset.attribution2
+        || sr?.getElementById('backgroundImageAttribution2')?.textContent?.trim()
+        || '';
+
+    // 提取纯艺术家名：去掉 "的艺术作品" / "的作品" 等后缀
+    const artist = attribution2.replace(/的(艺术)?作品$/, '').trim();
+
+    // 合集 ID，如 "rising_artists_collection"
+    const collectionId = themeEl?.dataset.collectionId || '';
+
+    // 归属链接
+    const attrUrl = themeEl?.dataset.attrUrl
+        || sr?.getElementById('backgroundImageAttribution')?.href
+        || '';
+
+    return { title, artist, collectionId, attrUrl };
 }
 
 // ── 读取背景图 URL（从 iframe src）───────────────────────────────────────
@@ -25,11 +47,28 @@ function getImageUrl() {
     return m ? decodeURIComponent(m[1]) : null;
 }
 
-// ── 文件名：优先使用艺术家名，退而使用时间戳 ────────────────────────────
-function buildFilename(attr) {
-    const artist = (attr.line2 || attr.line1 || '').replace(/[\\/:*?"<>|]/g, '_').trim();
-    const base = artist ? artist : 'chrome_newtab_bg';
-    return base + '_' + Date.now() + '.jpg';
+// ── 文件名：包含所有可用元信息 ───────────────────────────────────────────
+function sanitize(str) {
+    return str.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
+}
+
+function buildFilename(meta) {
+    const parts = [];
+
+    // 作品标题
+    if (meta.title)        parts.push(sanitize(meta.title));
+    // 艺术家
+    if (meta.artist)       parts.push(sanitize(meta.artist));
+    // 合集
+    if (meta.collectionId) parts.push(sanitize(meta.collectionId));
+    // 时间戳兜底（确保文件名唯一）
+    parts.push(String(Date.now()));
+
+    if (parts.length === 1) {
+        // 没有任何元信息，仅时间戳
+        return 'chrome_newtab_bg_' + parts[0] + '.jpg';
+    }
+    return parts.join('_') + '.jpg';
 }
 
 // ── 按钮状态 ─────────────────────────────────────────────────────────────
@@ -70,9 +109,9 @@ function doDownload(btn) {
         return;
     }
 
-    const attr     = getAttribution();
-    const filename = buildFilename(attr);
-    LOG('attribution:', attr);
+    const meta     = getMetadata();
+    const filename = buildFilename(meta);
+    LOG('metadata:', meta);
     LOG('filename:', filename);
 
     setButtonState(btn, STATE.loading);
