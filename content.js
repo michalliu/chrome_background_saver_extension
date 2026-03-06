@@ -82,10 +82,10 @@ function setButtonState(btn, state) {
     const btnLabel = btn.querySelector('.bgdl-label');
 
     const configs = {
-        [STATE.idle]:    { icon: '↓', text: '保存壁纸', color: 'rgba(255,255,255,0.18)' },
-        [STATE.loading]: { icon: '…', text: '下载中',   color: 'rgba(255,255,255,0.10)' },
-        [STATE.done]:    { icon: '✓', text: '已保存',   color: 'rgba(100,220,130,0.28)' },
-        [STATE.error]:   { icon: '✕', text: '失败',     color: 'rgba(255,100,100,0.28)' },
+        [STATE.idle]:    { icon: '↓', text: '', color: 'rgba(255,255,255,0.18)' },
+        [STATE.loading]: { icon: '…', text: '', color: 'rgba(255,255,255,0.10)' },
+        [STATE.done]:    { icon: '✓', text: '', color: 'rgba(100,220,130,0.28)' },
+        [STATE.error]:   { icon: '✕', text: '', color: 'rgba(255,100,100,0.28)' },
     };
     const c = configs[state];
     btnIcon.textContent  = c.icon;
@@ -144,7 +144,7 @@ function createButton() {
 
     const label = document.createElement('span');
     label.className = 'bgdl-label';
-    label.textContent = '保存壁纸';
+    label.textContent = '';
 
     btn.appendChild(icon);
     btn.appendChild(label);
@@ -156,9 +156,11 @@ function createButton() {
         zIndex:              '9999',
         display:             'flex',
         alignItems:          'center',
-        gap:                 '6px',
-        padding:             '0 16px',
+        gap:                 '0',
+        padding:             '0',
+        width:               '36px',
         height:              '36px',
+        justifyContent:      'center',
         border:              '1px solid rgba(255,255,255,0.35)',
         borderRadius:        '18px',
         background:          'rgba(255,255,255,0.18)',
